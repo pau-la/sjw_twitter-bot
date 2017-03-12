@@ -1,0 +1,151 @@
+// var tweets = require('tweets');
+var Twitter = require('twitter');
+var _ = require('underscore');
+var result = {};
+
+var hours = 1;
+var lastTweetTime = Date.now();
+
+var blackListWords = [
+	'sjw',
+	'and',
+	'i',
+	'the',
+	'rt',
+	'vs',
+	'np',
+	'sjws',
+	'from',
+	'on',
+	'in',
+	'a',
+	'has',
+	'youtube',
+	'httpstco',
+	'liked',
+	'to',
+	'will',
+	'it',
+	'you',
+	'or',
+	'ex',
+	'who',
+	'of',
+	'that',
+	'most',
+	'em',
+	'but',
+	'got',
+	'guy',
+	'try',
+	'was',
+	'if',
+	'be',
+	'1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+	'us', 'what', 'must', 'video', 'he', 'she', 'is', 'do', 'does', 'ppl', 'some', 
+	'not', 'ummm', 'we', 'they', 'only', 'sjwrocks', 'ive', 'never', 'are', 'am', 'a', 'an',
+	'as', 'get', 'this' 
+
+
+
+
+
+];
+
+var client = new Twitter({
+  consumer_key:        '6rvnCFgrg7mD3QV4evlyMCjfA',
+  consumer_secret:     'RrPavpxiINLYN6qBFMS8JgNgNYsRzE4od2Vy9fMJopbhvgyajb',
+  access_token_key:        '828258659876630528-2QMq89spH8MueOefnLsYSXcXUwr8sX5',
+  access_token_secret: 'dGrQH6Ezn1iXwCAoLLkdt1CoeV8H00yfmn06u3P1urLvY'
+});
+
+client.stream('statuses/filter', {track: 'sjw'},  function(stream) {
+  stream.on('data', function(tweet) {
+    processTweet(tweet);
+  });
+
+  stream.on('error', function(error) {
+    console.log(error);
+  });
+});
+
+var t = 0;
+setInterval(function() {
+	// t++;
+	// console.log(60 - (t % 60));
+	var timeLeft = Math.floor((1000 * 60 * 60 * hours) - (Date.now() - lastTweetTime) / 1000);
+	console.log('Time until tweet - ', timeLeft);
+}, 1000);
+
+setInterval(function() {
+	// send out a tweet
+	var numberOfWords = Object.keys(result).length;
+	var topTen = _.first(result, numberOfWords >= 10 ? 10 : Object.keys(result).length);
+	// tweet out the top ten...
+	// and reset the result...
+	
+
+	client.post('statuses/update', {status: topTen.join(', ')}, function(error, tweet, response) {
+		if (!error) {
+			console.log(tweet);
+		}
+	});
+
+	result = {};
+
+	lastTweetTime = Date.now();
+
+}, 1000 * 60 * 60 * hours);
+
+
+function processTweet(tweet) {
+	var words = tweet.text.split(' ');
+
+	// map takes an array, and produces a new array
+	// make the list lower case first
+	// [Hello, there, how, are, you]
+	words = _.map(words, function(word) {
+		// return the lower case word, as well as remove any special characters
+		return word.toLowerCase().replace(/[^a-z0-9]/gi,'');
+	});
+
+	wordCount = _.countBy(words, function(word) {
+		return word;
+	});
+
+	// get all the keys in old
+	// get all keys in new
+	// for all old, increment values
+	// for all new add to object
+	var oldKeys = Object.keys(result);
+	var newKeys = Object.keys(wordCount);
+
+	// this will give us the KEYS of the words which are new...
+	// we then need to remove all the objects from the word count
+	// that contain these keys
+	var difference = _.difference(newKeys, oldKeys);
+	_.extend(result, _.pick(wordCount, difference));
+
+
+	var intersection = _.intersection(newKeys, oldKeys);
+	// Add new counts to words that already exsist - which is defined by the intersection
+	_.each(intersection, function(word) {
+		result[word] += wordCount[word];
+	});
+
+	// // Add new words..
+	var sorted = sortResult();
+	var filtered = _.difference(sorted, blackListWords);
+	console.log(filtered);
+}
+
+
+function sortResult() {
+	var keys = Object.keys(result);
+	var ascending =  _.sortBy(keys, function(key) {
+		return result[key];
+	});
+
+	var descending = ascending.reverse();
+	return descending;
+}
